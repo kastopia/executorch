@@ -348,6 +348,32 @@ def _materialize_buffers(model, config):
             layer.attn.register_buffer("mask", mask)
 
 
+def _apply_turboquant(model, config):
+    """Replace KV caches in full-attention layers with TurboQuantKVCache.
+
+    Runs after _materialize_buffers so the new TQ4 buffers (uint8 packed,
+    fp32 norms, fp32 codebook/rotation) are created with correct dtypes
+    and not affected by the blanket bf16 cast in _quantize.
+    """
+    from executorch.extension.llm.modules.turboquant import TurboQuantKVCache
+
+    count = 0
+    for layer in model.layers:
+        if layer.layer_type != "full_attention":
+            continue
+        old_cache = layer.attn.kv_cache
+        _, n_heads, max_seq_len, head_dim = old_cache.k_cache.shape
+        layer.attn.kv_cache = TurboQuantKVCache(
+            n_heads,
+            head_dim,
+            max_seq_len,
+        )
+        layer.attn.turboquant = True
+        count += 1
+
+    print(f"Replaced {count} KV caches with TurboQuantKVCache (TQ4)")
+
+
 # ---------------------------------------------------------------------------
 # Export + lower
 # ---------------------------------------------------------------------------
@@ -480,6 +506,12 @@ def main():
         "containing model.safetensors and config.json. "
         "Skips quantization; --model-dir is not needed.",
     )
+    parser.add_argument(
+        "--turboquant",
+        action="store_true",
+        help="Enable TurboQuant TQ4 KV cache compression (3.8x cache savings). "
+        "Requires turboquant-vllm package.",
+    )
     args = parser.parse_args()
 
     if not args.prequantized and not args.model_dir:
@@ -493,6 +525,10 @@ def main():
 
     model, config = load_and_quantize(args)
     _materialize_buffers(model, config)
+
+    if args.turboquant:
+        _apply_turboquant(model, config)
+
     export_and_lower(model, config, args)
 
 

@@ -188,7 +188,7 @@ case "$HF_MODEL" in
     MODEL_NAME="qwen3_5_moe"
     TASK=""
     MAX_SEQ_LEN=""
-    EXTRA_PIP=""
+    EXTRA_PIP="turboquant-vllm==1.4.0"
     PREPROCESSOR_FEATURE_SIZE=""
     PREPROCESSOR_OUTPUT=""
     ;;
@@ -418,7 +418,8 @@ if [ "$MODEL_NAME" = "qwen3_5_moe" ]; then
   TORCHINDUCTOR_CACHE_DIR="$INDUCTOR_CACHE" \
   python -m executorch.examples.models.qwen3_5_moe.export \
       --prequantized "$LOCAL_MODEL_DIR" \
-      --output-dir "${OUTPUT_DIR}"
+      --output-dir "${OUTPUT_DIR}" \
+      --turboquant
   echo "::endgroup::"
 
   test -f "${OUTPUT_DIR}/model.pte"

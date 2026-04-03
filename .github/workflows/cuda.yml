@@ -139,14 +139,17 @@ jobs:
         # Install flash-linear-attention for chunk_gated_delta_rule triton kernel tests
         pip install "flash-linear-attention==0.4.2"
 
+        # Install turboquant-vllm for tq4_sdpa kernel tests
+        pip install "turboquant-vllm==1.4.0"
+
         # Build executor_runner (needed by CUDA backend e2e tests)
         cmake --build cmake-out --target executor_runner
 
         # Run CUDA backend Python tests
         python -m pytest backends/cuda/tests backends/cuda/passes/tests -v -o "addopts="
 
-        # Run quantize roundtrip tests (Qwen 3.5 MoE save/load prequantized)
-        python -m pytest examples/models/qwen3_5_moe/test_quantize_roundtrip.py -v -o "addopts="
+        # Run Qwen 3.5 MoE tests (quantize roundtrip + TurboQuant KV cache)
+        python -m pytest examples/models/qwen3_5_moe/test_quantize_roundtrip.py examples/models/qwen3_5_moe/test_turboquant.py -v -o "addopts="
 
   export-model-cuda-artifact:
     name: export-model-cuda-artifact
